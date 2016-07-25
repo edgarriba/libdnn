@@ -1672,10 +1672,10 @@ viennacl::ocl::handle<cl_mem> WrapHandle(
 
 template<typename Dtype>
 void LibDNNConv<Dtype>::Forward(const Dtype* bottom_data,
-                                 const Dtype* weight,
-                                 const Dtype* bias,
-                                 Dtype* top_data,
-                                 int_tp batch_size) {
+                                const Dtype* weight,
+                                const Dtype* bias,
+                                Dtype* top_data,
+                                int_tp batch_size) {
   int fw_wptn = fw_tuner_->get_param<int>("WPTN");
   int fw_wptm = fw_tuner_->get_param<int>("WPTM");
   int fw_wgs0 = fw_tuner_->get_param<int>("workgroup_size_0");

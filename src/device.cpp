@@ -67,145 +67,186 @@ void device::Init() {
 #endif  // !CPU_ONLY
 }
 
+#ifdef USE_OPENCL
+void device::memorySync(const std::vector<float>& data) {
+    // get devices
+    viennacl::ocl::platform pf = viennacl::ocl::get_platforms()[0];
+    std::vector<viennacl::ocl::device> const & devices = pf.devices();
+
+    // setup context
+    viennacl::ocl::setup_context(id_, devices[id_]);
+    viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
+
+    // instantiate containers
+    // TODO(edgar): getting the following error:
+    // error: variable ‘viennacl::vector<float> vcl_result’ has initializer but incomplete type
+    
+    // viennacl::vector<float> vcl_result(data.size(), ctx);
+    
+    // Copy to CPU to GPU
+    // viennacl::copy(data, vcl_result);
+}
+
+// Copy from OpenCL buffer to main memory
+void greentea_gpu_memcpy(const uint_tp N, const cl_mem X, const int_tp offX,
+                         void *Y, viennacl::ocl::context *ctx) {
+    if (Y != NULL) {
+        clEnqueueReadBuffer(ctx->get_queue().handle().get(), 
+                            X, CL_TRUE, offX, N, Y, 0, NULL, NULL);
+    }
+}
+
+// Copy from main memory to OpenCL buffer
+void greentea_gpu_memcpy(const uint_tp N, const void* X, cl_mem Y,
+                         const int_tp offY, viennacl::ocl::context *ctx) {
+    if (X != NULL) {
+        clEnqueueWriteBuffer(ctx->get_queue().handle().get(), Y,
+                             CL_TRUE, offY, N, X, 0, NULL, NULL);
+    }
+}
+
+#endif // USE_OPENCL
+
 Backend device::backend() const {
-  return backend_;
+    return backend_;
 }
 
 int device::id() const {
-  return id_;
+    return id_;
 }
 
 int device::list_id() const {
-  return list_id_;
+    return list_id_;
 }
 
 int device::workgroup_size(int id) {
-  return workgroup_sizes_[id % 3];
+    return workgroup_sizes_[id % 3];
 }
 
 #ifdef USE_OPENCL
 viennacl::ocl::program& device::program() {
-  return ocl_program_;
+    return ocl_program_;
 }
 #endif
 
 int device::num_queues() {
-  if (backend_ == BACKEND_CUDA) {
+    if (backend_ == BACKEND_CUDA) {
 #ifdef USE_CUDA
-    return 1;
+        return 1;
 #endif  // USE_CUDA
-  } else {
+    } else {
 #ifdef USE_OPENCL
-    // TODO(naibaf7): where do you set this value?
-    // return OPENCL_QUEUE_COUNT;
-    return 1;
+        // TODO(naibaf7): where do you set this value?
+        // return OPENCL_QUEUE_COUNT;
+        return 1;
 #endif  // USE_OPENCL
-  }
-  return 1;
+    }
+    return 1;
 }
 
 int device::current_queue_id() {
-  return current_queue_id_;
+    return current_queue_id_;
 }
 
 void device::SwitchQueue(const int id) {
-  if (backend_ == BACKEND_CUDA) {
+    if (backend_ == BACKEND_CUDA) {
 #ifdef USE_CUDA
-    (void) id;
+        (void) id;
 #endif  // USE_CUDA
-  } else {
+    } else {
 #ifdef USE_OPENCL
-    viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
-    ctx.switch_queue(id % num_queues());
-    current_queue_id_ = id % num_queues();
+        viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
+        ctx.switch_queue(id % num_queues());
+        current_queue_id_ = id % num_queues();
 #endif  // USE_OPENCL
-  }
+    }
 }
 
 void device::FinishQueues() {
-  if (backend_ == BACKEND_CUDA) {
+    if (backend_ == BACKEND_CUDA) {
 #ifdef USE_CUDA
 #endif  // USE_CUDA
-  } else {
+    } else {
 #ifdef USE_OPENCL
-    viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
-    for (int i = 0; i < num_queues(); ++i) {
-      ctx.switch_queue(i);
-      ctx.get_queue().finish();
-    }
-    ctx.switch_queue(0);
-    current_queue_id_ = 0;
+        viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
+        for (int i = 0; i < num_queues(); ++i) {
+            ctx.switch_queue(i);
+            ctx.get_queue().finish();
+        }
+        ctx.switch_queue(0);
+        current_queue_id_ = 0;
 #endif  // USE_OPENCL
-  }
+    }
 }
 
 uint_tp device::memory_usage() {
-  return memory_usage_;
+    return memory_usage_;
 }
 
 uint_tp device::peak_memory_usage() {
-  return peak_memory_usage_;
+    return peak_memory_usage_;
 }
 
 void device::IncreaseMemoryUsage(uint_tp bytes) {
-  memory_usage_ += bytes;
-  if (memory_usage_ > peak_memory_usage_) {
-    peak_memory_usage_ = memory_usage_;
-  }
+    memory_usage_ += bytes;
+    if (memory_usage_ > peak_memory_usage_) {
+        peak_memory_usage_ = memory_usage_;
+    }
 }
 
 void device::DecreaseMemoryUsage(uint_tp bytes) {
-  memory_usage_ -= bytes;
+    memory_usage_ -= bytes;
 }
 
 void device::ResetPeakMemoryUsage() {
-  peak_memory_usage_ = memory_usage_;
+    peak_memory_usage_ = memory_usage_;
 }
 
 bool device::CheckCapability(std::string cap) {
-  if (backend_ == BACKEND_OpenCL) {
+    if (backend_ == BACKEND_OpenCL) {
 #ifdef USE_OPENCL
-    viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
+        viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
 
-    size_t size;
-    size_t max_size = 1024 * 1024;
-    clGetDeviceInfo(ctx.devices()[0].id(), CL_DEVICE_EXTENSIONS,
-                    0, NULL, &size);
+        size_t size;
+        size_t max_size = 1024 * 1024;
+        clGetDeviceInfo(ctx.devices()[0].id(), CL_DEVICE_EXTENSIONS,
+                        0, NULL, &size);
 
-    // Cap at 1 MB to capture faulty OpenCL implementations (nVidia)
-    std::vector<char> exts(std::min(size, max_size));
+        // Cap at 1 MB to capture faulty OpenCL implementations (nVidia)
+        std::vector<char> exts(std::min(size, max_size));
 
-    clGetDeviceInfo(ctx.devices()[0].id(), CL_DEVICE_EXTENSIONS,
-                    size, &(exts[0]), NULL);
+        clGetDeviceInfo(ctx.devices()[0].id(), CL_DEVICE_EXTENSIONS,
+                        size, &(exts[0]), NULL);
 
-    std::string extsstr(&(exts[0]));
-    return extsstr.find(cap) != std::string::npos;
+        std::string extsstr(&(exts[0]));
+        return extsstr.find(cap) != std::string::npos;
 #endif
-  }
-  return false;
+    }
+    return false;
 }
 
 bool device::CheckVendor(std::string vendor) {
-  if (backend_ == Backend::BACKEND_CUDA) {
-    if (vendor.compare("NVIDIA") == 0)
-      return true;
-  }
+    if (backend_ == Backend::BACKEND_CUDA) {
+        if (vendor.compare("NVIDIA") == 0){
+            return true;
+        }
+    }
 #ifdef USE_OPENCL
-  else if (backend_ == BACKEND_OpenCL) {
-    viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
-    const viennacl::ocl::device &device = ctx.current_device();
+    else if (backend_ == BACKEND_OpenCL) {
+        viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
+        const viennacl::ocl::device &device = ctx.current_device();
 
-    if (device.vendor().find(vendor) != std::string::npos)
-      return true;
-  }
+        if (device.vendor().find(vendor) != std::string::npos) {
+            return true;
+        }
+    }
 #endif
-
-  return false;
+    return false;
 }
 
 #ifdef USE_OPENCL
 bool device::is_host_unified() {
-  return host_unified_;
+    return host_unified_;
 }
 
 const char* clGetErrorString(cl_int error) {

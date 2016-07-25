@@ -15,6 +15,7 @@ class device {
  public:
   explicit device();
   explicit device(int id, int list_id, Backend backend);
+
   Backend backend() const;
   int id() const;
   int list_id() const;
@@ -22,13 +23,14 @@ class device {
   int workgroup_size(int id);
 
 #ifdef USE_OPENCL
-  bool is_host_unified();
-  static void setupViennaCLContext(int id,
-                                   const cl_context ctx,
-                                   const cl_device_id dev,
-                                   const cl_command_queue queue);
+    bool is_host_unified();
+    static void setupViennaCLContext(int id,
+                                     const cl_context ctx,
+                                     const cl_device_id dev,
+                                     const cl_command_queue queue);
 
-  viennacl::ocl::program& program();
+    viennacl::ocl::program& program();
+    void memorySync(const std::vector<float>& data);
 #endif  // USE_OPENCL
 
   int num_queues();
